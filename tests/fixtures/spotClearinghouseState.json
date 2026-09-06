@@ -1,14 +1,25 @@
 {
  "balances": [
   {
-   "coin": "@/PURR",
-   "hold": "1000.0",
-   "total": "1000.0"
+   "coin": "USDC",
+   "token": 0,
+   "total": "0.15840517",
+   "hold": "0.0",
+   "entryNtl": "0.0"
   },
   {
-   "coin": "@1/HFUN",
+   "coin": "HYPE",
+   "token": 150,
+   "total": "0.0",
    "hold": "0.0",
-   "total": "25.5"
+   "entryNtl": "0.0"
+  },
+  {
+   "coin": "MAX",
+   "token": 734,
+   "total": "1008221.2826",
+   "hold": "0.0",
+   "entryNtl": "0.0"
   }
  ]
 }

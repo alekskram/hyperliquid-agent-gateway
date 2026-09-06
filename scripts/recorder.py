@@ -28,6 +28,11 @@ import hyperliquid_mcp.evm as evm        # noqa: E402
 import hyperliquid_mcp.info as info      # noqa: E402
 
 # (fixture filename, info request type, extra body) - the 11 /info types
+# Account types use a busy live trader (44 open positions incl. an
+# isolated one) so clearinghouseState/userFills/userFunding fixtures
+# carry rich REAL data in the LIVE response shape (no markPx in
+# positions, no withdrawable in marginSummary).
+_RECORD_USER = "0xbeccae9ffcb69e9d42a1d4e744abf8056149562d"
 INFO_JOBS = [
     ("meta", "meta", {}),
     ("metaAndAssetCtxs", "metaAndAssetCtxs", {}),
@@ -36,20 +41,24 @@ INFO_JOBS = [
     ("allMids", "allMids", {}),
     ("l2Book", "l2Book", {"coin": "BTC"}),
     ("candleSnapshot", "candleSnapshot",
-     {"coin": "BTC", "interval": "1h",
-      "startTime": int((time.time() - 48 * 3600) * 1000)}),
+     {"req": {"coin": "BTC", "interval": "1h",
+              "startTime": int((time.time() - 48 * 3600) * 1000)}}),
     ("fundingHistory", "fundingHistory",
      {"coin": "BTC", "startTime": int((time.time() - 168 * 3600) * 1000)}),
     ("recentTrades", "recentTrades", {"coin": "BTC"}),
     ("clearinghouseState", "clearinghouseState",
-     {"user": "0x1fc7f7fbd00f9c37edcb53a0a823a5b9f7dc9a44"}),
+     {"user": _RECORD_USER}),
     ("userFills", "userFills",
-     {"user": "0x1fc7f7fbd00f9c37edcb53a0a823a5b9f7dc9a44"}),
+     {"user": _RECORD_USER}),
     ("userFunding", "userFunding",
-     {"user": "0x1fc7f7fbd00f9c37edcb53a0a823a5b9f7dc9a44"}),
+     {"user": _RECORD_USER}),
     ("spotClearinghouseState", "spotClearinghouseState",
-     {"user": "0x1fc7f7fbd00f9c37edcb53a0a823a5b9f7dc9a44"}),
+     {"user": _RECORD_USER}),
 ]
+
+# cap list-shaped fixtures so the repo stays lean; the offline suite
+# does not need 2000 rows to prove parsing
+_MAX_ROWS = {"userFills": 500, "userFunding": 500}
 
 
 def record(out_dir: Path, only: list[str] | None = None) -> int:
@@ -65,23 +74,30 @@ def record(out_dir: Path, only: list[str] | None = None) -> int:
         except (ValueError, RuntimeError) as e:
             print(f"[skip] {name}: {e}")
             continue
+        if isinstance(payload, list) and name in _MAX_ROWS:
+            payload = payload[:_MAX_ROWS[name]]
         (out_dir / f"{name}.json").write_text(json.dumps(payload, indent=1))
         print(f"[ok]   {name}.json "
               f"({(out_dir / f'{name}.json').stat().st_size} bytes)")
         written += 1
     # eth_getLogs: Transfer logs for the canonical PURR contract over a
-    # modest adaptive window
+    # modest adaptive window; skipped when the window came back empty
+    # (protects an existing non-empty fixture from being blanked)
     if not only or "getLogs" in only or "eth_getLogs" in only:
         try:
             latest = evm.block_number()
             walked = evm.get_logs(
-                "0x9bb8a77a9333b1bc70907b2a20b8d5c1f5f9d6ce",
+                "0x9b498c3c8a0b8cd8ba1d9851d40d186f1872b44e",
                 max(0, latest - 60), latest)
             payload = walked["logs"]
-            (out_dir / "getLogs.json").write_text(
-                json.dumps(payload, indent=1))
-            print(f"[ok]   getLogs.json ({len(payload)} logs)")
-            written += 1
+            if not payload:
+                print("[skip] getLogs: 0 logs in window (existing "
+                      "fixture kept)")
+            else:
+                (out_dir / "getLogs.json").write_text(
+                    json.dumps(payload, indent=1))
+                print(f"[ok]   getLogs.json ({len(payload)} logs)")
+                written += 1
         except (evm.RpcError, ValueError, RuntimeError) as e:
             print(f"[skip] getLogs: {e}")
     return written

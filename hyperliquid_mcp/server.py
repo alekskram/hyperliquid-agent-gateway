@@ -27,7 +27,7 @@ from . import evm
 from . import info
 
 DEFAULT_PORT = 8903
-_VERSION = "0.1.0"
+_VERSION = "0.1.1"
 
 _ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 
@@ -50,6 +50,37 @@ _INTERVAL_SECONDS = {
 _TRANSFERS_TTL = 60.0
 _TRANSFERS_CACHE: dict[str, tuple[float, dict]] = {}
 _TOOL_CACHE_LOCK = __import__("threading").Lock()
+
+# Fallback decimals map for contracts NOT covered by spotMeta
+# (spotMeta's weiDecimals + evm_extra_wei_decimals is the primary
+# source - USDC 8-2=6, PURR 5+13=18); keyed by lowercased address.
+_TOKEN_DECIMALS: dict[str, int] = {
+    "0x6b9e773128f453f5c2c60935ee2de2cbc5390a24": 6,   # USDC (canonical)
+    "0x9b498c3c8a0b8cd8ba1d9851d40d186f1872b44e": 18,  # PURR (canonical)
+    "0x5555555555555555555555555555555555555555": 18,   # HYPE (canonical)
+}
+_DEC_DEFAULT = 18
+
+
+def _decimals_for(contract: str) -> tuple[int, str]:
+    """(decimals, source) for an ERC-20 contract; static map first,
+    otherwise (18, "assumed_18") - honest about the guess."""
+    d = _TOKEN_DECIMALS.get((contract or "").lower())
+    if d is not None:
+        return d, "static_map"
+    return _DEC_DEFAULT, "assumed_18"
+
+
+def _units_from_raw(raw: str | int | None,
+                    decimals: int) -> float | None:
+    """Raw integer units -> float units at `decimals` (6dp rounding);
+    None stays None."""
+    if raw is None:
+        return None
+    try:
+        return _round(int(raw) / 10 ** int(decimals), 6)
+    except (TypeError, ValueError):
+        return None
 
 
 # ------------------------------------------------------------------ helpers
@@ -271,7 +302,11 @@ def spot_overview(limit: int = 20) -> dict:
                 token_rows.append({
                     "name": t.get("name"),
                     "index": t.get("index"),
-                    "token": t.get("token"),  # 0x ERC-20 address or name
+                    # LIVE spotMeta: 0x contract at evmContract.address
+                    # (the legacy "token" field no longer exists)
+                    "token": ((t.get("evmContract") or {}).get("address")
+                              if isinstance(t.get("evmContract"), dict)
+                              else None) or t.get("token"),
                     "is_canonical_pair": bool(u.get("isCanonical")),
                 })
         rows.append({
@@ -555,12 +590,57 @@ def funding_history(coin: str, limit: int = 100) -> dict:
     return out
 
 
+def _funding_usdc(row) -> float | None:
+    """Payment USD from a userFunding row. LIVE form: delta is an
+    OBJECT {type, coin, usdc, szi, fundingRate, nSamples}; legacy
+    handcrafted fixtures carried a plain string. Returns None when
+    neither shape parses (never raises)."""
+    d = (row or {}).get("delta")
+    if isinstance(d, dict):
+        return _f(d.get("usdc"))
+    return _f(d)
+
+
+def _resolve_mark(coin: str,
+                  errors: list[dict]) -> tuple[float | None, str | None]:
+    """Mark px for `coin` when the position payload omits markPx (the
+    LIVE clearinghouseState response does not carry it in positions).
+    Source order: metaAndAssetCtxs markPx (60s cache, shared with the
+    tool) -> allMids (15s cache). Returns (mark, source); (None, None)
+    when neither source knows the coin - callers must then keep
+    distances null instead of guessing."""
+    if coin:
+        try:
+            ctx = _perp_ctx(coin)
+            mark = _f((ctx or {}).get("markPx"))
+            if mark:
+                return mark, "metaAndAssetCtxs"
+        except (ValueError, RuntimeError) as e:
+            errors.append(_err("info", f"mark lookup via "
+                                      f"metaAndAssetCtxs failed for "
+                                      f"{coin}: {e}",
+                               "mark_px fallback degraded"))
+        try:
+            mark = _f((info.all_mids() or {}).get(coin))
+            if mark:
+                return mark, "allMids"
+        except (ValueError, RuntimeError) as e:
+            errors.append(_err("info", f"mark lookup via allMids failed "
+                                      f"for {coin}: {e}",
+                               "mark_px omitted"))
+    return None, None
+
+
 def liquidation_risk(address: str) -> dict:
     """KEY TOOL. Liquidation risk for one perp account
     (clearinghouseState + userFunding): margin summary (accountValue,
     totalRawUsd, totalMarginUsed, withdrawable), cross maintenance
     margin, per-position leverage/entry/mark/unrealizedPnl and
-    liquidationPx when the venue provides it. When liquidationPx is
+    liquidationPx when the venue provides it. Positions in the LIVE
+    clearinghouseState response carry NO markPx: mark is resolved per
+    coin from metaAndAssetCtxs (fallback allMids) and each row says
+    where it came from in mark_px_source ('position' | 
+    'metaAndAssetCtxs' | 'allMids' | null). When liquidationPx is
     null, liq_distance_pct is an ESTIMATE from the maintenance-margin
     ratio (crossMaintenanceMarginUsed / marginSummary.accountValue;
     isolated positions use marginUsed / positionValue) - flagged
@@ -584,6 +664,10 @@ def liquidation_risk(address: str) -> dict:
         coin = p.get("coin", "")
         entry = _f(p.get("entryPx"))
         mark = _f(p.get("markPx"))
+        mark_src = "position" if mark is not None else None
+        if mark is None:
+            # LIVE responses omit markPx in positions - resolve per coin
+            mark, mark_src = _resolve_mark(coin, errors)
         szi = _f(p.get("szi"))
         lev = p.get("leverage") or {}
         pos_value = _f(p.get("positionValue"))
@@ -597,6 +681,7 @@ def liquidation_risk(address: str) -> dict:
             "leverage_type": lev.get("type"),  # cross | isolated
             "entry_px": entry,
             "mark_px": mark,
+            "mark_px_source": mark_src,
             "position_value": pos_value,
             "margin_used": margin_used,
             "unrealized_pnl": _f(p.get("unrealizedPnl")),
@@ -636,7 +721,7 @@ def liquidation_risk(address: str) -> dict:
     funding_drag = None
     try:
         funding = info.user_funding(addr)
-        neg = [ _f(f.get("delta")) for f in funding or [] ]
+        neg = [ _funding_usdc(f) for f in funding or [] ]
         neg = [x for x in neg if x is not None]
         if neg:
             funding_drag = {
@@ -667,7 +752,14 @@ def liquidation_risk(address: str) -> dict:
                 "ESTIMATE from the maintenance-margin ratio "
                 "(crossMaintenanceMarginUsed/accountValue for cross, "
                 "marginUsed/positionValue for isolated) divided by "
-                "leverage - treat as a rough risk ranking only.",
+                "leverage - treat as a rough risk ranking only. The "
+                "live clearinghouseState carries no markPx in "
+                "positions: mark is resolved per coin from "
+                "metaAndAssetCtxs (fallback allMids) and each row "
+                "reports mark_px_source ('position' | "
+                "'metaAndAssetCtxs' | 'allMids' | null); withdrawable "
+                "in margin_summary may be omitted by the venue while "
+                "positions are open (null, not zero).",
     }
     if errors:
         out["warnings"] = errors
@@ -721,7 +813,7 @@ def trader_activity(address: str, limit: int = 50) -> dict:
     funding_net = None
     try:
         funding = info.user_funding(addr)
-        deltas = [x for x in (_f(f.get("delta")) for f in funding or [])
+        deltas = [x for x in (_funding_usdc(f) for f in funding or [])
                   if x is not None]
         if deltas:
             funding_net = _round(sum(deltas), 2)
@@ -743,6 +835,10 @@ def trader_activity(address: str, limit: int = 50) -> dict:
                     "entry_px": _f(p.get("entryPx")),
                     "unrealized_pnl": _f(p.get("unrealizedPnl")),
                     "leverage": _f((p.get("leverage") or {}).get("value")),
+                    "mark_px": (_f(p.get("markPx")) if
+                                p.get("markPx") is not None else
+                                _resolve_mark(p.get("coin", ""),
+                                              errors)[0]),
                 })
     except (ValueError, RuntimeError) as e:
         errors.append(_err("info", f"clearinghouseState unavailable: {e}",
@@ -888,6 +984,7 @@ def token_transfers(contract: str, limit: int = 100,
                     "unhandled rpc failure")
     logs = walked.get("logs") or []
     win = walked.get("window") or {}
+    dec, dec_src = _decimals_for(addr)
     rows: list[dict] = []
     for log in logs:
         units = _hex_units(log.get("data"))
@@ -905,7 +1002,7 @@ def token_transfers(contract: str, limit: int = 100,
             "from": _topic_address(topics[1] if len(topics) > 1 else None),
             "to": _topic_address(topics[2] if len(topics) > 2 else None),
             "value_raw": str(units) if units is not None else None,
-            "value": _round(_wei_to_units(units)),
+            "value": _units_from_raw(units, dec),
             "txHash": log.get("transactionHash"),
             "blockNumber": (_i(int(log.get("blockNumber"), 16))
                             if isinstance(log.get("blockNumber"), str)
@@ -920,6 +1017,8 @@ def token_transfers(contract: str, limit: int = 100,
         "contract": addr,
         "count": len(rows),
         "transfers": rows,
+        "decimals": dec,
+        "decimals_source": dec_src,
         "window": {
             "from_block": win.get("from_block"),
             "to_block": win.get("to_block"),
@@ -962,18 +1061,28 @@ def wallet_balance(address: str) -> dict:
         errors.append(_err("evm", f"native balance unavailable: {e}",
                            e.kind))
 
-    # ERC-20s from spotMeta tokens (cap 20 to respect 100/min)
+    # ERC-20s from spotMeta tokens (cap 20 to respect 100/min). LIVE
+    # spotMeta carries no "token" field: the ERC-20 contract lives at
+    # evmContract.address, and true decimals = weiDecimals +
+    # evm_extra_wei_decimals (USDC 8-2=6, PURR 5+13=18).
     try:
         sm = info.spot_meta()
         erc20s = []
         seen: set[str] = set()
         for t in (sm.get("tokens") or []):
-            tok = (t.get("token") or "")
+            ec = t.get("evmContract") or {}
+            tok = (ec.get("address")
+                   if isinstance(ec, dict) else None) or ""
             if isinstance(tok, str) and _ADDRESS_RE.match(tok) \
                     and tok.lower() not in seen:
                 seen.add(tok.lower())
+                dec = None
+                wd = t.get("weiDecimals")
+                if isinstance(wd, int):
+                    dec = wd + (ec.get("evm_extra_wei_decimals") or 0)
                 erc20s.append({"name": t.get("name"),
-                               "contract": tok.lower()})
+                               "contract": tok.lower(),
+                               "decimals": dec})
             if len(erc20s) >= 20:
                 break
     except (ValueError, RuntimeError) as e:
@@ -1009,10 +1118,32 @@ def wallet_balance(address: str) -> dict:
                 "balance_raw": b.get("total"),
                 "balance": _round(_f(b.get("total"))),
                 "source": "spotClearinghouseState",
+                "note": "exchange balance in token units (raw string "
+                        "upstream, not wei)",
             })
     except (ValueError, RuntimeError) as e:
         errors.append(_err("info", f"spot balances unavailable: {e}",
                            "spotClearinghouseState failure"))
+
+    # annotate rows with the decimals actually used: spotMeta-provided
+    # decimals win (weiDecimals + evm_extra_wei_decimals), then the
+    # static canonical map, else 18 assumed
+    meta_dec = {t["contract"]: t["decimals"] for t in erc20s
+                if t.get("decimals") is not None}
+    for t in tokens_out:
+        c = t.get("contract")
+        if c or t.get("token") == "NATIVE":
+            if c in meta_dec:
+                dec, dec_src = meta_dec[c], "spotMeta"
+            else:
+                dec, dec_src = _decimals_for(c or "")
+            if t.get("balance_raw") is not None and t.get("source") in (
+                    "eth_call balanceOf", "eth_getBalance"):
+                t["balance"] = _units_from_raw(
+                    int(t["balance_raw"]) if str(
+                        t["balance_raw"]).isdigit() else None, dec)
+            t["decimals"] = dec
+            t["decimals_source"] = dec_src
 
     out: dict = {
         "address": addr,
@@ -1024,7 +1155,12 @@ def wallet_balance(address: str) -> dict:
                 "spotMeta (100 req/min rpc budget); spot rows are "
                 "Hyperliquid-exchange balances (coin may be an "
                 "'@{index}/BASE' pair). Zero-balance rows are kept for "
-                "auditability.",
+                "auditability. ERC-20/native balances convert raw->"
+                "units with per-token decimals: static map for "
+                "canonical tokens (USDC/USDT-style 6, PURR/HYPE 18), "
+                "otherwise 18 with decimals_source='assumed_18' - "
+                "check decimals_source before trusting 6dp values for "
+                "unknown tokens.",
     }
     if errors:
         out["warnings"] = errors

@@ -1,6 +1,6 @@
 # hyperliquid-agent-gateway
 
-Status: pre-release (v0.1.0; PyPI publication pending - repository URL
+Status: pre-release (v0.1.1; PyPI publication pending - repository URL
 is a placeholder until the owner account publishes).
 
 An MCP (Model Context Protocol) server that gives AI agents read-only,
@@ -64,11 +64,11 @@ destructiveHint: false, openWorldHint: true`).
 | 5 | `candles` | `candles(coin, interval="1h", limit=100)` | OHLCV rows newest-first; intervals 1m/15m/1h/4h/1d/1w/1M; `startTime` computed from `limit`. |
 | 6 | `trades` | `trades(coin, limit=20)` | Recent public fills WITH both sides' addresses (`users: [maker, taker]`). |
 | 7 | `funding_history` | `funding_history(coin, limit=100)` | Hourly funding rows + `premium_now` from the live asset ctx. |
-| 8 | `liquidation_risk` | `liquidation_risk(address)` | Per-account risk: margin summary, cross maintenance margin, per-position leverage + `liquidationPx` when published; when null, an explicitly flagged ESTIMATED distance from the maintenance-margin ratio. Includes funding drag. |
+| 8 | `liquidation_risk` | `liquidation_risk(address)` | Per-account risk: margin summary, cross maintenance margin, per-position leverage + `liquidationPx` when published; when null, an explicitly flagged ESTIMATED distance from the maintenance-margin ratio. Mark px is resolved per coin from `metaAndAssetCtxs` (fallback `allMids`) because live positions carry no `markPx` - see `mark_px_source` on each row. Includes funding drag. |
 | 9 | `trader_activity` | `trader_activity(address, limit=50)` | Fills PnL/fees/volume/win-rate, funding net, open positions, per-coin breakdown. |
 | 10 | `funding_carry_screener` | `funding_carry_screener(topN=10, metric="premium")` | Ranks ALL perps from ONE call; `fundingHistory` fetched only for the topN (weight economy). |
-| 11 | `token_transfers` | `token_transfers(contract, limit=100, from_block=None)` | HyperEVM ERC-20 Transfer logs via adaptive-window `eth_getLogs`; rows carry from/to/value (6dp)/txHash/blockNumber/ts. |
-| 12 | `wallet_balance` | `wallet_balance(address)` | Native (eth_getBalance) + up to 20 ERC-20s (eth_call balanceOf, resolved from spotMeta) + Hyperliquid spot balances. |
+| 11 | `token_transfers` | `token_transfers(contract, limit=100, from_block=None)` | HyperEVM ERC-20 Transfer logs via adaptive-window `eth_getLogs`; rows carry from/to/value/txHash/blockNumber/ts with per-token `decimals` + `decimals_source` (static map or `assumed_18`). |
+| 12 | `wallet_balance` | `wallet_balance(address)` | Native (eth_getBalance) + up to 20 ERC-20s (eth_call balanceOf, resolved from spotMeta) + Hyperliquid spot balances; every row carries `decimals`/`decimals_source`. |
 
 ## Rate limits
 
@@ -110,7 +110,17 @@ per-address account types 60s.
   partial data degrades field-by-field with `warnings[]`.
 - `liquidation_risk` never invents a liquidation price: when the venue
   publishes none, `liq_px` stays `null` and the distance is an
-  explicitly flagged estimate (formula in the tool's note).
+  explicitly flagged estimate (formula in the tool's note). Mark px is
+  likewise never invented: live positions carry no `markPx`, so it is
+  resolved from `metaAndAssetCtxs` (fallback `allMids`) and the row's
+  `mark_px_source` says which; no source -> `null`.
+- `funding_drag` / `funding_net`: the venue's `userFunding` returns
+  only NON-ZERO funding events, so a live `null`/empty for a fresh or
+  quiet address is expected behaviour, not a bug.
+- ERC-20 amounts use a static decimals map for canonical HyperEVM
+  tokens (6 for USDC/USDT-style, 18 for PURR/HYPE); unknown tokens
+  assume 18 and every row says `decimals_source: "assumed_18"` - do
+  not trust 6dp precision for unmapped tokens.
 - Cached responses carry `age_seconds` / `fetched_at` freshness fields.
 
 ## Offline tests

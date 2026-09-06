@@ -68,7 +68,7 @@ class TestRequestBodies:
 
         def fake(req, timeout=None):
             seen.append(json.loads(req.data.decode()))
-            from tests.conftest import FakeResponse
+            from conftest import FakeResponse
             return FakeResponse({})
 
         monkeypatch.setattr(urllib.request, "urlopen", fake)
@@ -80,7 +80,7 @@ class TestRequestBodies:
 
         def fake(req, timeout=None):
             seen.append(dict(req.headers))
-            from tests.conftest import FakeResponse
+            from conftest import FakeResponse
             return FakeResponse({})
 
         monkeypatch.setattr(urllib.request, "urlopen", fake)
@@ -149,7 +149,7 @@ class TestRetries:
             state["n"] += 1
             if state["n"] == 1:
                 raise _http_error(req.full_url, 429, "Too Many Requests")
-            from tests.conftest import FakeResponse
+            from conftest import FakeResponse
             return FakeResponse(load("allMids.json"))
 
         monkeypatch.setattr(urllib.request, "urlopen", flaky)
@@ -166,7 +166,7 @@ class TestRetries:
             state["n"] += 1
             if state["n"] <= 2:
                 raise _http_error(req.full_url, 503, "Service Unavailable")
-            from tests.conftest import FakeResponse
+            from conftest import FakeResponse
             return FakeResponse(load("allMids.json"))
 
         monkeypatch.setattr(urllib.request, "urlopen", flaky)
@@ -219,7 +219,7 @@ def _throw(url, code, msg):
 
 
 def load(name):
-    from tests.conftest import load as _load
+    from conftest import load as _load
     return _load(name)
 
 
@@ -235,7 +235,7 @@ class TestTypedHelpers:
 
         def fake(req, timeout=None):
             seen.append(json.loads(req.data.decode()))
-            from tests.conftest import FakeResponse
+            from conftest import FakeResponse
             return FakeResponse(load("l2Book.json"))
 
         monkeypatch.setattr(urllib.request, "urlopen", fake)
@@ -248,7 +248,7 @@ class TestTypedHelpers:
 
         def fake(req, timeout=None):
             seen.append(json.loads(req.data.decode()))
-            from tests.conftest import FakeResponse
+            from conftest import FakeResponse
             return FakeResponse(load("l2Book.json"))
 
         monkeypatch.setattr(urllib.request, "urlopen", fake)
@@ -261,7 +261,7 @@ class TestTypedHelpers:
 
         def fake(req, timeout=None):
             seen.append(json.loads(req.data.decode()))
-            from tests.conftest import FakeResponse
+            from conftest import FakeResponse
             return FakeResponse(load("clearinghouseState.json"))
 
         monkeypatch.setattr(urllib.request, "urlopen", fake)

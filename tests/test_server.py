@@ -179,7 +179,9 @@ class TestSpotOverview:
     def test_token_rows_carry_contract(self, mock_info):
         out = srv.spot_overview()
         toks = [t for r in out["pairs"] for t in r["tokens"]]
-        assert any(t.get("token", "").startswith("0x") for t in toks)
+        # LIVE spotMeta: ERC-20 contracts live at evmContract.address
+        assert any(isinstance(t.get("token"), str)
+                   and t["token"].startswith("0x") for t in toks)
 
     def test_limit(self, mock_info):
         assert srv.spot_overview(limit=2)["returned"] == 2
@@ -231,9 +233,10 @@ class TestQuote:
 class TestOrderBook:
     def test_levels_each_side(self, mock_info):
         ob = srv.order_book("BTC")
-        assert len(ob["levels"]["bids"]) == 5
-        assert len(ob["levels"]["asks"]) == 5
-        assert ob["n_sig_figs"] == 5  # from fixture levels
+        bids, asks = srv._book_sides(L2BOOK)
+        assert len(ob["levels"]["bids"]) == min(10, len(bids))
+        assert len(ob["levels"]["asks"]) == min(10, len(asks))
+        assert ob["n_sig_figs"] == srv._i(bids[0].get("n"))
         assert ob["total_bid_liquidity"] > 0
         assert ob["total_ask_liquidity"] > 0
 
@@ -297,7 +300,7 @@ class TestCandles:
 class TestTrades:
     def test_rows_with_users(self, mock_info):
         out = srv.trades("BTC")
-        assert out["count"] == 20
+        assert out["count"] == len(TRADES)
         t = out["trades"][0]
         assert len(t["users"]) == 2  # both sides
         assert t["side"] in ("B", "A")
@@ -353,47 +356,115 @@ class TestLiquidationRisk:
     def test_margin_summary_parsed(self, mock_info):
         out = srv.liquidation_risk(ADDR)
         ms = out["margin_summary"]
-        assert ms["account_value"] == 25000.55
-        assert ms["total_margin_used"] == 12000.0
-        assert out["cross_maintenance_margin_used"] == 960.0
+        ms_raw = CH_STATE["marginSummary"]
+        assert ms["account_value"] == float(ms_raw["accountValue"])
+        assert ms["total_margin_used"] == float(
+            ms_raw["totalMarginUsed"])
+        assert out["cross_maintenance_margin_used"] == float(
+            CH_STATE["crossMaintenanceMarginUsed"])
 
     def test_liqpx_present_not_estimated(self, mock_info):
         out = srv.liquidation_risk(ADDR)
-        btc = next(p for p in out["positions"] if p["coin"] == "BTC")
-        assert btc["liq_px"] == 52800.0
-        assert btc["estimated"] is False
-        assert btc["liq_distance_pct"] == pytest.approx(
-            (52800.0 - btc["mark_px"]) / btc["mark_px"] * 100, abs=0.01)
+        # pick any position the venue gives a liquidationPx for
+        raw = {ap["position"]["coin"]: ap["position"]
+               for ap in CH_STATE["assetPositions"]}
+        coin = next(c for c, p in raw.items()
+                    if p.get("liquidationPx") is not None)
+        row = next(p for p in out["positions"] if p["coin"] == coin)
+        assert row["liq_px"] == float(raw[coin]["liquidationPx"])
+        assert row["estimated"] is False
+        assert row["liq_distance_pct"] == pytest.approx(
+            (row["liq_px"] - row["mark_px"]) / row["mark_px"] * 100,
+            abs=0.01)
 
-    def test_isolated_null_liqpx_estimated(self, mock_info):
+    def test_live_form_mark_resolved_from_ctxs(self, mock_info):
+        # LIVE fixture positions carry NO markPx: mark must come from
+        # metaAndAssetCtxs (mark_px_source says so) and distances must
+        # be computable again
+        raw_btc = next(
+            ap["position"] for ap in CH_STATE["assetPositions"]
+            if ap["position"]["coin"] == "BTC")
+        assert "markPx" not in raw_btc
         out = srv.liquidation_risk(ADDR)
-        eth = next(p for p in out["positions"] if p["coin"] == "ETH")
-        assert eth["liq_px"] is None
-        assert eth["estimated"] is True
-        assert eth["liq_distance_pct"] is not None
-        # isolated: mm ratio = 1/(posValue/marginUsed), dist = 100*ratio/lev
-        assert eth["liq_distance_pct"] == pytest.approx(
-            100.0 * (1.0 / (30000.0 / 3000.0)) / 10.0, rel=0.01)
+        btc = next(p for p in out["positions"] if p["coin"] == "BTC")
+        assert btc["mark_px_source"] == "metaAndAssetCtxs"
+        assert btc["mark_px"] == pytest.approx(BTC_MARK, rel=0.001)
+        assert btc["liq_distance_pct"] is not None
+
+    def test_mark_fallback_allmids(self, mock_info, monkeypatch):
+        # metaAndAssetCtxs loses the coin -> allMids answers
+        def fake_ctxs():
+            return [{"universe": [{"name": "ZZZ"}]},
+                    [{"markPx": "1.0"}]]
+        monkeypatch.setattr(info, "meta_and_asset_ctxs", fake_ctxs)
+        out = srv.liquidation_risk(ADDR)
+        btc = next(p for p in out["positions"] if p["coin"] == "BTC")
+        assert btc["mark_px_source"] == "allMids"
+        assert btc["mark_px"] == pytest.approx(
+            float(MIDS["BTC"]), rel=0.001)
+
+    def test_mark_absent_honest_none(self, mock_info, monkeypatch):
+        def boom(*a, **k):
+            raise RuntimeError("ctxs down")
+        monkeypatch.setattr(info, "meta_and_asset_ctxs", boom)
+        monkeypatch.setattr(info, "all_mids", lambda: {})
+        out = srv.liquidation_risk(ADDR)
+        btc = next(p for p in out["positions"] if p["coin"] == "BTC")
+        assert btc["mark_px"] is None
+        assert btc["mark_px_source"] is None
+        assert btc["liq_distance_pct"] is None
+        assert out["warnings"]  # lookup failures surfaced
+
+    def test_isolated_position_liqpx(self, mock_info):
+        # live fixture: MEGA is isolated WITH liquidationPx
+        out = srv.liquidation_risk(ADDR)
+        mega = next(p for p in out["positions"] if p["coin"] == "MEGA")
+        assert mega["leverage_type"] == "isolated"
+        assert mega["liq_px"] is not None
+        assert mega["estimated"] is False
+        assert mega["liq_distance_pct"] is not None
 
     def test_cross_null_liqpx_estimated(self, mock_info):
         out = srv.liquidation_risk(ADDR)
-        sol = next(p for p in out["positions"] if p["coin"] == "SOL")
-        assert sol["liq_px"] is None and sol["estimated"] is True
-        # cross: mm ratio = crossMM/accountValue
-        assert sol["liq_distance_pct"] == pytest.approx(
-            100.0 * (960.0 / 25000.55) / 5.0, rel=0.01)
+        # find a cross position where the venue omits liquidationPx
+        raw = {ap["position"]["coin"]: ap["position"]
+               for ap in CH_STATE["assetPositions"]}
+        coin = next(c for c, p in raw.items()
+                    if (p.get("leverage") or {}).get("type") != "isolated"
+                    and p.get("liquidationPx") is None)
+        row = next(p for p in out["positions"] if p["coin"] == coin)
+        assert row["liq_px"] is None and row["estimated"] is True
+        assert row["liq_distance_pct"] == pytest.approx(
+            100.0 * (out["cross_maintenance_margin_used"] /
+                     out["margin_summary"]["account_value"]) /
+            (row["leverage"] or 1.0), rel=0.01)
 
     def test_funding_drag(self, mock_info):
         out = srv.liquidation_risk(ADDR)
         fd = out["funding_drag"]
-        assert fd["events"] == len(UFUND)
-        neg = sum(min(0.0, float(f["delta"])) for f in UFUND)
-        assert fd["paid_usd"] == pytest.approx(-neg, abs=0.01)
+        deltas = [srv._funding_usdc(f) for f in UFUND]
+        deltas = [d for d in deltas if d is not None]
+        assert fd["events"] == len(deltas)
+        assert fd["paid_usd"] == pytest.approx(
+            -sum(d for d in deltas if d < 0), abs=0.01)
+        assert fd["received_usd"] == pytest.approx(
+            sum(d for d in deltas if d > 0), abs=0.01)
+
+    def test_funding_usdc_live_object_form(self, mock_info):
+        # LIVE userFunding rows: delta is an OBJECT with usdc
+        row = UFUND[0]
+        assert isinstance(row["delta"], dict)
+        assert srv._funding_usdc(row) == float(row["delta"]["usdc"])
+        assert srv._funding_usdc({"delta": "-1.5"}) == -1.5
+        assert srv._funding_usdc({"delta": None}) is None
 
     def test_sides(self, mock_info):
         out = srv.liquidation_risk(ADDR)
-        sides = {p["coin"]: p["side"] for p in out["positions"]}
-        assert sides["BTC"] == "long" and sides["ETH"] == "short"
+        raw = {ap["position"]["coin"]: ap["position"]
+               for ap in CH_STATE["assetPositions"]}
+        for p in out["positions"][:5]:
+            szi = float(raw[p["coin"]]["szi"])
+            assert p["side"] == ("long" if szi > 0 else "short")
 
     def test_upstream_failure_error_dict(self, monkeypatch):
         def boom(a):
@@ -418,17 +489,18 @@ class TestLiquidationRisk:
 class TestTraderActivity:
     def test_totals(self, mock_info):
         out = srv.trader_activity(ADDR)
-        assert out["fills_analyzed"] == 40
-        pnl = sum(float(f["closedPnl"]) for f in FILLS)
+        assert out["fills_analyzed"] == min(len(FILLS), 50)
+        pnl = sum(float(f["closedPnl"]) for f in FILLS[:50])
         assert out["total_closed_pnl"] == pytest.approx(pnl, abs=0.01)
-        vol = sum(float(f["px"]) * float(f["sz"]) for f in FILLS)
+        vol = sum(float(f["px"]) * float(f["sz"]) for f in FILLS[:50])
         assert out["total_volume"] == pytest.approx(vol, abs=1.0)
 
     def test_win_rate(self, mock_info):
         out = srv.trader_activity(ADDR)
-        wins = sum(1 for f in FILLS if float(f["closedPnl"]) > 0)
+        seg = FILLS[:50]
+        wins = sum(1 for f in seg if float(f["closedPnl"]) > 0)
         assert out["win_rate_pct"] == pytest.approx(
-            wins / len(FILLS) * 100, abs=0.01)
+            wins / len(seg) * 100, abs=0.01)
 
     def test_per_coin_breakdown(self, mock_info):
         out = srv.trader_activity(ADDR)
@@ -438,8 +510,11 @@ class TestTraderActivity:
 
     def test_open_positions(self, mock_info):
         out = srv.trader_activity(ADDR)
-        assert out["open_positions"] == 3
-        assert len(out["open_position_rows"]) == 3
+        n_open = sum(
+            1 for ap in CH_STATE["assetPositions"]
+            if float(ap["position"].get("szi") or 0))
+        assert out["open_positions"] == n_open
+        assert len(out["open_position_rows"]) == n_open
         assert out["funding_net"] is not None
 
     def test_limit(self, mock_info):
@@ -518,7 +593,7 @@ class TestFundingCarryScreener:
 
 class TestTokenTransfers:
     def test_rows(self, mock_evm):
-        out = srv.token_transfers("0x9bb8a77a9333b1bc70907b2a20b8d5c1f5f9d6ce")
+        out = srv.token_transfers("0x9b498c3c8a0b8cd8ba1d9851d40d186f1872b44e")
         assert out["count"] == 12
         r = out["transfers"][0]
         for k in ("from", "to", "value", "value_raw", "txHash",
@@ -527,13 +602,13 @@ class TestTokenTransfers:
         assert r["from"].startswith("0x") and len(r["from"]) == 42
 
     def test_value_format_6dp(self, mock_evm):
-        out = srv.token_transfers("0x9bb8a77a9333b1bc70907b2a20b8d5c1f5f9d6ce")
+        out = srv.token_transfers("0x9b498c3c8a0b8cd8ba1d9851d40d186f1872b44e")
         for r in out["transfers"]:
             assert r["value"] == round(int(r["value_raw"]) / 1e18, 6)
             assert r["value_raw"] == str(int(r["value_raw"]))
 
     def test_newest_first(self, mock_evm):
-        out = srv.token_transfers("0x9bb8a77a9333b1bc70907b2a20b8d5c1f5f9d6ce")
+        out = srv.token_transfers("0x9b498c3c8a0b8cd8ba1d9851d40d186f1872b44e")
         blks = [r["blockNumber"] for r in out["transfers"]]
         assert blks == sorted(blks, reverse=True)
 

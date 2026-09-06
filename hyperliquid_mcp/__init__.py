@@ -8,4 +8,4 @@ Package layout:
 No private keys, no signing, no order placement - public data only.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

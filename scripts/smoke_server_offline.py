@@ -70,7 +70,7 @@ evm.get_logs = lambda c, f, t: {"logs": load("getLogs.json"), "window": {
     "newest_covered": t, "stopped_reason": "complete", "note": "covered"}}
 
 ADDR = "0x1fc7f7fbd00f9c37edcb53a0a823a5b9f7dc9a44"
-CONTRACT = "0x9bb8a77a9333b1bc70907b2a20b8d5c1f5f9d6ce"
+CONTRACT = "0x9b498c3c8a0b8cd8ba1d9851d40d186f1872b44e"
 
 # ------------------------------------------------------------- 12 tools
 
@@ -113,13 +113,16 @@ check("funding_history: rows + premium_now",
       fh["count"] == 48 and fh["premium_now"] is not None)
 
 lr = srv.liquidation_risk(ADDR)
-btc_pos = next(p for p in lr["positions"] if p["coin"] == "BTC")
-eth_pos = next(p for p in lr["positions"] if p["coin"] == "ETH")
+with_liq = next(p for p in lr["positions"] if p["liq_px"] is not None)
+no_liq = next(p for p in lr["positions"] if p["liq_px"] is None)
 check("liquidation_risk: liqPx present -> not estimated",
-      btc_pos["liq_px"] is not None and btc_pos["estimated"] is False)
+      with_liq["estimated"] is False and with_liq["liq_distance_pct"] is not None)
 check("liquidation_risk: null liqPx -> estimated flag",
-      eth_pos["liq_px"] is None and eth_pos["estimated"] is True
-      and eth_pos["liq_distance_pct"] is not None)
+      no_liq["estimated"] is True and no_liq["liq_distance_pct"] is not None)
+check("liquidation_risk: LIVE form - mark resolved (no markPx in position)",
+      all(p["mark_px"] is not None for p in lr["positions"])
+      and {p["mark_px_source"] for p in lr["positions"]} <=
+      {"metaAndAssetCtxs", "allMids"})
 check("liquidation_risk: funding drag present",
       lr["funding_drag"] and lr["funding_drag"]["events"] > 0)
 
