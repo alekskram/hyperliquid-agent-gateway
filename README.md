@@ -1,5 +1,10 @@
 # hyperliquid-agent-gateway
 
+[![CI](https://github.com/alekskram/hyperliquid-agent-gateway/actions/workflows/tests.yml/badge.svg)](https://github.com/alekskram/hyperliquid-agent-gateway/actions/workflows/tests.yml)
+[![PyPI](https://img.shields.io/pypi/v/hyperliquid-agent-gateway.svg)](https://pypi.org/project/hyperliquid-agent-gateway/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](pyproject.toml)
+
 An MCP (Model Context Protocol) server that gives AI agents read-only,
 keyless access to **Hyperliquid** public data - the ~233-perp DEX
 market, ~326 spot pairs, funding, per-account risk and HyperEVM (chain
