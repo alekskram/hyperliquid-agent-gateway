@@ -149,7 +149,7 @@ TTL caches additionally dedupe repeated calls per data type: allMids
 spotMetaAndAssetCtxs 60s, candleSnapshot 300s, fundingHistory 300s,
 per-address account types 60s.
 
-## Honesty and degradation
+## Data notes
 
 - Every numeric from the API is a STRING upstream; the gateway parses
   them with a never-raising helper - `null` always means "not
