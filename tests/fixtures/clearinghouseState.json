@@ -1,0 +1,83 @@
+{
+ "marginSummary": {
+  "accountValue": "25000.55",
+  "totalNtlPos": "80000.0",
+  "totalRawUsd": "25000.55",
+  "totalMarginUsed": "12000.0",
+  "withdrawable": "13000.55"
+ },
+ "crossMaintenanceMarginUsed": "960.0",
+ "crossMarginSummary": {
+  "accountValue": "25000.55",
+  "totalNtlPos": "80000.0",
+  "totalRawUsd": "25000.55",
+  "totalMarginUsed": "12000.0",
+  "withdrawable": "13000.55"
+ },
+ "withdrawable": "13000.55",
+ "assetPositions": [
+  {
+   "type": "oneWay",
+   "position": {
+    "coin": "BTC",
+    "szi": "0.5",
+    "leverage": {
+     "type": "cross",
+     "value": 20
+    },
+    "entryPx": "60000.0",
+    "positionValue": "30000.0",
+    "unrealizedPnl": "150.25",
+    "returnOnEquity": "0.1001",
+    "liquidationPx": "52800.0",
+    "marginUsed": "1500.0",
+    "marginValue": "1500.0",
+    "maintMarginUsed": "225.0",
+    "isolatedMargin": null,
+    "markPx": "60150.0"
+   }
+  },
+  {
+   "type": "oneWay",
+   "position": {
+    "coin": "ETH",
+    "szi": "-12.0",
+    "leverage": {
+     "type": "isolated",
+     "value": 10
+    },
+    "entryPx": "2500.0",
+    "positionValue": "30000.0",
+    "unrealizedPnl": "-60.0",
+    "returnOnEquity": "-0.02",
+    "liquidationPx": null,
+    "marginUsed": "3000.0",
+    "marginValue": "3000.0",
+    "maintMarginUsed": "240.0",
+    "isolatedMargin": "3000.0",
+    "markPx": "2480.0"
+   }
+  },
+  {
+   "type": "oneWay",
+   "position": {
+    "coin": "SOL",
+    "szi": "100.0",
+    "leverage": {
+     "type": "cross",
+     "value": 5
+    },
+    "entryPx": "200.0",
+    "positionValue": "20000.0",
+    "unrealizedPnl": "80.0",
+    "returnOnEquity": "0.02",
+    "liquidationPx": null,
+    "marginUsed": "4000.0",
+    "marginValue": "4000.0",
+    "maintMarginUsed": "160.0",
+    "isolatedMargin": null,
+    "markPx": "201.0"
+   }
+  }
+ ]
+}

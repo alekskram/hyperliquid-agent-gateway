@@ -1,0 +1,15 @@
+[Unit]
+Description=Hyperliquid Agent Gateway - fixture recorder schedule (6h)
+Documentation=https://github.com/hyperliquid-agent-gateway/hyperliquid-agent-gateway
+
+[Timer]
+# Every 6 hours; keeps tests/fixtures/ schema-realistic without
+# approaching either rate budget (a pass costs ~264 /info weight and
+# 1-2 rpc requests).
+# OPT-IN ONLY: this unit ships DISABLED. Enable explicitly with
+#   systemctl enable --now hyperliquid-recorder.timer
+OnCalendar=*-*-* 00/6:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

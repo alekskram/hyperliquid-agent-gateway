@@ -1,0 +1,124 @@
+[
+ {
+  "universe": [
+   {
+    "name": "@0/PURR",
+    "tokens": [
+     0,
+     1
+    ],
+    "isCanonical": true,
+    "index": 0
+   },
+   {
+    "name": "@1/HYPE",
+    "tokens": [
+     1,
+     5
+    ],
+    "isCanonical": true,
+    "index": 1
+   },
+   {
+    "name": "@0/kPEPE",
+    "tokens": [
+     0,
+     6
+    ],
+    "isCanonical": true,
+    "index": 2
+   },
+   {
+    "name": "@1/NEGRO",
+    "tokens": [
+     1,
+     7
+    ],
+    "isCanonical": true,
+    "index": 3
+   }
+  ],
+  "tokens": [
+   {
+    "name": "PURR",
+    "index": 0,
+    "token": "0x9bb8a77a9333b1bc70907b2a20b8d5c1f5f9d6ce"
+   },
+   {
+    "name": "HFUN",
+    "index": 1,
+    "token": "0x536f2d5a850f0f4b1cfbbd3f6f7b8c9d0e1f2a3b"
+   },
+   {
+    "name": "USDt",
+    "index": 2,
+    "token": "0xc9f5e3a72d81b04c6ea5f3d2b1a098f7e6d5c4b3"
+   },
+   {
+    "name": "kPEPE",
+    "index": 3,
+    "token": "0x1234567890abcdef1234567890abcdef12345678"
+   },
+   {
+    "name": "JEFF",
+    "index": 4,
+    "token": "0x011ae7e195acf7d5a192a8088b7e99dead12652d"
+   },
+   {
+    "name": "POINT",
+    "index": 5,
+    "token": "0x081ddd8784f19c466b5b1c1032e8b5845a73a218"
+   },
+   {
+    "name": "RNG",
+    "index": 6,
+    "token": "0x479a487f4374ce4fcd7a775a4bd2f3bcf8473799"
+   }
+  ],
+  "deployAuctionStatus": "derivative",
+  "registeredContracts": [
+   {
+    "name": "purrfect",
+    "builder": "0x6f1ac2c1a0e5cbbdd01e2b1c1f1d8c0acbb1a2ea"
+   }
+  ]
+ },
+ [
+  {
+   "markPx": "5.136626",
+   "midPx": "5.136626",
+   "dayNtlVlm": "6646669.08",
+   "prevDayPx": "5.180072",
+   "circulating": "702381772.04",
+   "coin": "@0/PURR",
+   "funding": "0.0000095338"
+  },
+  {
+   "markPx": "17.186780",
+   "midPx": "17.186780",
+   "dayNtlVlm": "18853135.04",
+   "prevDayPx": "16.435536",
+   "circulating": "784618965.67",
+   "coin": "@1/HYPE",
+   "funding": "-0.0000071769"
+  },
+  {
+   "markPx": "22.383465",
+   "midPx": "22.383465",
+   "dayNtlVlm": "7634745.21",
+   "prevDayPx": "22.168635",
+   "circulating": "572464948.07",
+   "coin": "@0/kPEPE",
+   "funding": "-0.0000032093"
+  },
+  {
+   "markPx": "26.432944",
+   "midPx": "26.432944",
+   "dayNtlVlm": "25176345.66",
+   "prevDayPx": "27.832432",
+   "circulating": "468733390.49",
+   "coin": "@1/NEGRO",
+   "funding": "-0.0000025684"
+  }
+ ]
+]

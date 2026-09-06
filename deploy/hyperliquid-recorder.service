@@ -1,0 +1,16 @@
+[Unit]
+Description=Hyperliquid Agent Gateway - fixture recorder (one pass)
+Documentation=https://github.com/hyperliquid-agent-gateway/hyperliquid-agent-gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# One pass = 13 /info requests (~264 weight, well inside 1200/min) plus
+# 1-2 HyperEVM eth_getLogs calls (inside 100/min). Fixtures land in
+# tests/fixtures/ of the checkout below.
+WorkingDirectory=/opt/hyperliquid-agent-gateway
+ExecStart=/usr/bin/env python scripts/recorder.py --out tests/fixtures
+Environment=PYTHONUNBUFFERED=1
+# A full pass is ~15 requests: 1-3 minutes worst case with retries
+TimeoutStartSec=300

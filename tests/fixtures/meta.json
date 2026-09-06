@@ -1,0 +1,154 @@
+{
+ "universe": [
+  {
+   "name": "BTC",
+   "szDecimals": 5,
+   "maxLeverage": 5,
+   "onlyIsolated": false
+  },
+  {
+   "name": "ETH",
+   "szDecimals": 2,
+   "maxLeverage": 40,
+   "onlyIsolated": false
+  },
+  {
+   "name": "SOL",
+   "szDecimals": 5,
+   "maxLeverage": 20,
+   "onlyIsolated": false
+  },
+  {
+   "name": "HYPE",
+   "szDecimals": 4,
+   "maxLeverage": 10,
+   "onlyIsolated": false
+  },
+  {
+   "name": "ARB",
+   "szDecimals": 3,
+   "maxLeverage": 40,
+   "onlyIsolated": false
+  },
+  {
+   "name": "DOGE",
+   "szDecimals": 5,
+   "maxLeverage": 3,
+   "onlyIsolated": false
+  },
+  {
+   "name": "AVAX",
+   "szDecimals": 5,
+   "maxLeverage": 5,
+   "onlyIsolated": false
+  },
+  {
+   "name": "LINK",
+   "szDecimals": 3,
+   "maxLeverage": 40,
+   "onlyIsolated": false
+  },
+  {
+   "name": "XRP",
+   "szDecimals": 5,
+   "maxLeverage": 3,
+   "onlyIsolated": false
+  },
+  {
+   "name": "TON",
+   "szDecimals": 2,
+   "maxLeverage": 5,
+   "onlyIsolated": false
+  },
+  {
+   "name": "SUI",
+   "szDecimals": 3,
+   "maxLeverage": 5,
+   "onlyIsolated": false
+  },
+  {
+   "name": "AVS",
+   "szDecimals": 4,
+   "maxLeverage": 3,
+   "onlyIsolated": false
+  },
+  {
+   "name": "POKT",
+   "szDecimals": 3,
+   "maxLeverage": 5,
+   "onlyIsolated": false
+  },
+  {
+   "name": "GRASS",
+   "szDecimals": 3,
+   "maxLeverage": 20,
+   "onlyIsolated": false
+  },
+  {
+   "name": "OP",
+   "szDecimals": 2,
+   "maxLeverage": 10,
+   "onlyIsolated": false
+  },
+  {
+   "name": "ARB2",
+   "szDecimals": 4,
+   "maxLeverage": 3,
+   "onlyIsolated": false
+  },
+  {
+   "name": "AAVE",
+   "szDecimals": 4,
+   "maxLeverage": 5,
+   "onlyIsolated": false
+  },
+  {
+   "name": "CRV",
+   "szDecimals": 4,
+   "maxLeverage": 10,
+   "onlyIsolated": false
+  },
+  {
+   "name": "LTC",
+   "szDecimals": 5,
+   "maxLeverage": 20,
+   "onlyIsolated": false
+  },
+  {
+   "name": "BCH",
+   "szDecimals": 4,
+   "maxLeverage": 10,
+   "onlyIsolated": false
+  },
+  {
+   "name": "TRX",
+   "szDecimals": 3,
+   "maxLeverage": 10,
+   "onlyIsolated": false
+  },
+  {
+   "name": "ATOM",
+   "szDecimals": 5,
+   "maxLeverage": 10,
+   "onlyIsolated": false
+  },
+  {
+   "name": "NEAR",
+   "szDecimals": 5,
+   "maxLeverage": 3,
+   "onlyIsolated": false
+  },
+  {
+   "name": "APT",
+   "szDecimals": 5,
+   "maxLeverage": 10,
+   "onlyIsolated": false
+  },
+  {
+   "name": "SEI",
+   "szDecimals": 3,
+   "maxLeverage": 40,
+   "onlyIsolated": false
+  }
+ ]
+}
