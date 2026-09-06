@@ -267,16 +267,22 @@ def candle_snapshot(coin: str, interval: str, start_time: int) -> list:
     "i": "1h", "o": "...", "c": "...", "h": "...", "l": "...",
     "v": "...", "n": n}, ...] oldest-first; numerics are STRINGS."""
     return _cached_get("candleSnapshot",
-                       {"coin": _norm_coin(coin), "interval": interval,
-                        "startTime": int(start_time)})
+                       {"req": {"coin": _norm_coin(coin),
+                                "interval": interval,
+                                "startTime": int(start_time)}})
 
 
 def funding_history(coin: str, start_time: int | None = None,
                     end_time: int | None = None) -> list:
-    """[{coin, fundingRate, premium, time}, ...] (300s cache), newest-last."""
-    body: dict = {"coin": _norm_coin(coin)}
-    if start_time is not None:
-        body["startTime"] = int(start_time)
+    """[{coin, fundingRate, premium, time}, ...] (300s cache), newest-last.
+
+    startTime is REQUIRED upstream; when omitted it defaults to 7 days
+    ago (hourly funding -> ~168 rows).
+    """
+    if start_time is None:
+        start_time = int((time.time() - 7 * 24 * 3600) * 1000)
+    body: dict = {"coin": _norm_coin(coin),
+                  "startTime": int(start_time)}
     if end_time is not None:
         body["endTime"] = int(end_time)
     return _cached_get("fundingHistory", body,

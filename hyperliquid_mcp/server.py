@@ -336,9 +336,7 @@ def quote(coin: str) -> dict:
         return _err("info", f"quote data unavailable for {coin!r}: {e}",
                     "upstream /info failure")
     mid = _f(mids.get(raw)) if isinstance(mids, dict) else None
-    levels = (book or {}).get("levels") or {}
-    bids = levels.get("bids") or []
-    asks = levels.get("asks") or []
+    bids, asks = _book_sides(book)
     bid = _f(bids[0].get("px")) if bids else None
     ask = _f(asks[0].get("px")) if asks else None
     bid_sz = _f(bids[0].get("sz")) if bids else None
@@ -360,6 +358,20 @@ def quote(coin: str) -> dict:
     }
 
 
+def _book_sides(book: dict | None) -> tuple[list, list]:
+    """(bids, asks) from an l2Book payload, tolerant to BOTH live shapes:
+    the documented array form "levels": [bids, asks] and a dict form
+    {"bids": [...], "asks": [...]} some proxies/wrappers produce.
+    Never raises; missing sides -> empty lists."""
+    levels = (book or {}).get("levels")
+    if isinstance(levels, dict):
+        return (levels.get("bids") or [],
+                levels.get("asks") or [])
+    if isinstance(levels, list) and len(levels) == 2:
+        return (levels[0] or [], levels[1] or [])
+    return ([], [])
+
+
 def order_book(coin: str, depth: int = 10) -> dict:
     """Aggregated order book for one coin from l2Book: `depth` levels per
     side (default 10, max 100), aggregated by the book's nSigFigs
@@ -377,13 +389,17 @@ def order_book(coin: str, depth: int = 10) -> dict:
     except (ValueError, RuntimeError) as e:
         return _err("info", f"l2Book unavailable for {coin!r}: {e}",
                     "upstream /info failure")
-    levels = (book or {}).get("levels") or {}
+    bids, asks = _book_sides(book)
+    levels = {"bids": bids, "asks": asks}
     n = max(1, min(100, int(depth)))
     sig = None
     for side in ("bids", "asks"):
         for lvl in levels.get(side) or []:
-            if lvl.get("nSigFigs") is not None:
-                sig = _i(lvl.get("nSigFigs"))
+            for sig_key in ("nSigFigs", "n"):
+                if lvl.get(sig_key) is not None:
+                    sig = _i(lvl.get(sig_key))
+                    break
+            if sig is not None:
                 break
         if sig is not None:
             break

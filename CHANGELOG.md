@@ -16,7 +16,8 @@ Initial release.
   liquidation_risk, trader_activity, funding_carry_screener,
   token_transfers, wallet_balance - all annotated read-only with honest
   degradation (error dicts, never tracebacks) and freshness fields.
-- Offline test suite (67 tests) on schema-realistic fixtures; live
-  online checks opt-in via `-m online`.
+- Offline test suite on schema-realistic fixtures (well over a hundred
+  checks; run `pytest -q` for the exact count); live online checks are
+  opt-in via `-m online`.
 - `scripts/recorder.py` live-fixture recorder + systemd units
   (6h schedule, disabled by default).

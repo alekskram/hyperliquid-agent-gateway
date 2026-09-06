@@ -223,6 +223,11 @@ def balance_of(contract: str, address: str, block="latest") -> int:
     data = BALANCE_OF_SELECTOR + _pad_address(address)
     res = post("eth_call", [{"to": (contract or "").strip().lower(),
                              "data": data}, _block_param(block)])
+    # "0x" (empty) means the contract replied with no data; the widely
+    # observed live case is a zero balance on non-standard proxies, and
+    # the safe read-only interpretation is 0 - not a hard error.
+    if res in (None, "0x", ""):
+        return 0
     try:
         return int(res, 16)
     except (TypeError, ValueError):
