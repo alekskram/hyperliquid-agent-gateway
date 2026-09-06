@@ -1,8 +1,5 @@
 # hyperliquid-agent-gateway
 
-Status: pre-release (v0.1.1; PyPI publication pending - repository URL
-is a placeholder until the owner account publishes).
-
 An MCP (Model Context Protocol) server that gives AI agents read-only,
 keyless access to **Hyperliquid** public data - the ~233-perp DEX
 market, ~326 spot pairs, funding, per-account risk and HyperEVM (chain
@@ -11,18 +8,28 @@ every tool reads public endpoints only (`api.hyperliquid.xyz/info` and
 `rpc.hyperliquid.xyz/evm`), cached and rate-limited so an enthusiastic
 agent cannot hammer the upstream.
 
+## Use cases
+
+- **Watch a wallet's risk** — per-account margin summary, leverage, liquidation distance on any address (`account risk` view)
+- **Fund the carry, not the noise** — funding history + carry screener across 233 perps to find stable paid positions
+- **Trace HyperEVM flows** — token transfers on chain 999 tied back to the perp markets (`token_transfers`)
+- **Read the book before you enter** — order book + recent trades + all-mids in one pass
+- **Trader scouting** — activity of any address: positions, volume, what they actually trade
+
+Full walkthroughs: [examples/use-cases.md](examples/use-cases.md).
+
 ## Quickstart
 
 stdio (default, for local agents):
 
 ```bash
-uvx --from git+https://github.com/hyperliquid-agent-gateway/hyperliquid-agent-gateway hyperliquid-agent-gateway
+uvx hyperliquid-agent-gateway
 ```
 
 or from a checkout:
 
 ```bash
-git clone https://github.com/hyperliquid-agent-gateway/hyperliquid-agent-gateway
+git clone https://github.com/alekskram/hyperliquid-agent-gateway
 cd hyperliquid-agent-gateway
 uv sync
 uv run hyperliquid-agent-gateway
@@ -36,7 +43,7 @@ Claude Desktop / Cursor config:
     "hyperliquid": {
       "command": "uvx",
       "args": ["--from",
-               "git+https://github.com/hyperliquid-agent-gateway/hyperliquid-agent-gateway",
+               "git+https://github.com/alekskram/hyperliquid-agent-gateway",
                "hyperliquid-agent-gateway"]
     }
   }
@@ -48,6 +55,43 @@ Hosted form - streamable HTTP on port **8903**:
 ```bash
 uv run hyperliquid-agent-gateway --http            # 127.0.0.1:8903
 curl http://127.0.0.1:8903/health   # -> {"ok": true, "service": "hyperliquid-agent-gateway", ...}
+```
+
+<details>
+<summary><b>Codex</b> (~/.codex/config.toml)</summary>
+
+```toml
+[mcp_servers.hyperliquid]
+command = "uvx"
+args = ["hyperliquid-agent-gateway"]
+```
+</details>
+
+<details>
+<summary><b>ZCode</b> — register the server (copy-paste)</summary>
+
+```bash
+# 1) start the gateway (keep it running)
+uvx hyperliquid-agent-gateway --http --port 8903 &
+
+# 2) register it (merges into ~/.zcode/cli/config.json)
+python3 - <<'PY'
+import json, os
+p = os.path.expanduser("~/.zcode/cli/config.json")
+os.makedirs(os.path.dirname(p), exist_ok=True)
+cfg = json.load(open(p)) if os.path.exists(p) else {}
+cfg.setdefault("mcp", {}).setdefault("servers", {})["hyperliquid"] = {
+    "type": "http", "url": "http://127.0.0.1:8903/mcp"}
+json.dump(cfg, open(p, "w"), indent=2)
+print("hyperliquid-agent-gateway registered:", p)
+PY
+```
+</details>
+
+Hosted form — streamable HTTP on port **8903**:
+
+```bash
+uvx hyperliquid-agent-gateway --http
 ```
 
 ## Tools
@@ -123,19 +167,6 @@ per-address account types 60s.
   not trust 6dp precision for unmapped tokens.
 - Cached responses carry `age_seconds` / `fetched_at` freshness fields.
 
-## Offline tests
-
-The suite runs 100% offline against schema-realistic fixtures in
-`tests/fixtures/` - no network, no live API:
-
-```bash
-uv sync --dev
-uv run pytest -q          # offline suite (online checks deselected)
-uv run pytest -m online   # LIVE checks (opt-in, ~10 requests)
-```
-
-Fixtures are refreshed by `scripts/recorder.py` (one ~264-weight pass;
-see `deploy/` for the optional 6h systemd timer).
 
 ## License
 
