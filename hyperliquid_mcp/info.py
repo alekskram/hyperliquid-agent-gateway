@@ -142,9 +142,29 @@ _CACHE_LOCK = threading.Lock()
 
 
 def _cache_key(req_type: str, body: dict) -> str:
-    """Stable cache key: type + sorted identity params (address/coin/interval)."""
-    ident = {k: v for k, v in body.items()
-             if k != "type" and isinstance(v, (str, int, float))}
+    """Stable cache key: type + sorted identity params (address/coin/interval).
+
+    Nested param dicts (candleSnapshot wraps coin/interval/startTime in
+    "req") are flattened one level so they actually reach the key — a
+    flat scalar-only filter collapsed them and let one coin's snapshot
+    poison every coin for the TTL. Millisecond-epoch values (startTime/
+    endTime) are bucketed to 300s so repeated calls with a drifting
+    "now"-derived window still hit the cache.
+    """
+    ident: dict = {}
+
+    def _add(k: str, v) -> None:
+        if isinstance(v, dict):
+            for ik, iv in v.items():
+                _add(f"{k}.{ik}", iv)
+        elif isinstance(v, (str, int, float)) and not isinstance(v, bool):
+            if k.endswith("Time") and isinstance(v, int) and v > 10 ** 12:
+                v = v // 300_000  # bucket ms-epochs to the shortest TTL
+            ident[k] = v
+
+    for k, v in body.items():
+        if k != "type":
+            _add(k, v)
     suffix = "".join(f"|{k}={ident[k]}" for k in sorted(ident))
     return req_type + suffix
 

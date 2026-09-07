@@ -50,6 +50,25 @@ class TestTTLCache:
         b = info.clearinghouse_state("0x" + "22" * 20)
         assert calls.count("clearinghouseState") == 2
 
+    def test_candlesnapshot_per_coin_isolation(self, info_mock):
+        """Regression (live S4 run, MEC-119): candleSnapshot params live in
+        a nested "req" dict; the old scalar-only key collapsed them, so the
+        first coin's snapshot poisoned every coin/interval for the TTL
+        (BTC 15m request returned ETH 1h rows)."""
+        mod, calls, clock = info_mock
+        eth = info.candle_snapshot("ETH", "1h", 1735700000000)
+        btc = info.candle_snapshot("BTC", "15m", 1735700000000)
+        assert calls.count("candleSnapshot") == 2
+        assert btc is not eth
+
+    def test_candlesnapshot_key_stable_across_drifting_window(self, info_mock):
+        """The "now"-derived startTime drifts per call; ms-epochs are
+        bucketed to 300s in the key so the TTL cache still hits."""
+        mod, calls, clock = info_mock
+        info.candle_snapshot("ETH", "1h", 1735700000000)
+        info.candle_snapshot("ETH", "1h", 1735700090000)  # +90s drift
+        assert calls.count("candleSnapshot") == 1
+
     def test_cache_age_reports_seconds(self, info_mock):
         mod, calls, clock = info_mock
         info.meta_and_asset_ctxs()
