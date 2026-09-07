@@ -1,6 +1,6 @@
 [Unit]
 Description=Hyperliquid Agent Gateway - fixture recorder schedule (6h)
-Documentation=https://github.com/hyperliquid-agent-gateway/hyperliquid-agent-gateway
+Documentation=https://github.com/alekskram/hyperliquid-agent-gateway
 
 [Timer]
 # Every 6 hours; keeps tests/fixtures/ schema-realistic without

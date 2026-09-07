@@ -1,6 +1,6 @@
 [Unit]
 Description=Hyperliquid Agent Gateway - fixture recorder (one pass)
-Documentation=https://github.com/hyperliquid-agent-gateway/hyperliquid-agent-gateway
+Documentation=https://github.com/alekskram/hyperliquid-agent-gateway
 After=network-online.target
 Wants=network-online.target
 
