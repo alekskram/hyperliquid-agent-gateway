@@ -326,27 +326,43 @@ def clearinghouse_state(address: str) -> dict:
     liquidationPx may be null (cross positions without enough isolation
     detail). Numerics are STRINGS except flags.
     """
-    return _cached_get("clearinghouseState", {"user": _norm_addr(address)})
+    r = _cached_get("clearinghouseState", {"user": _norm_addr(address)})
+    if not isinstance(r, dict):
+        raise ValueError(f"clearinghouseState returned unexpected payload "
+                         f"type {type(r).__name__}: {str(r)[:80]}")
+    return r
 
 
 def user_fills(address: str) -> list:
     """[{coin, dir, px, sz, time, closedPnl, fee, feeToken, builderFee,
     hash}, ...] (60s per-address cache)."""
-    return _cached_get("userFills", {"user": _norm_addr(address)})
+    r = _cached_get("userFills", {"user": _norm_addr(address)})
+    if not isinstance(r, list):
+        raise ValueError(f"userFills returned unexpected payload type "
+                         f"{type(r).__name__}: {str(r)[:80]}")
+    return r
 
 
 def user_funding(address: str) -> list:
     """[{coin, fundingRate, premium, time, delta}, ...] non-zero funding
     payments (60s per-address cache); delta is the USD payment (STRING,
     negative when the trader pays)."""
-    return _cached_get("userFunding", {"user": _norm_addr(address)})
+    r = _cached_get("userFunding", {"user": _norm_addr(address)})
+    if not isinstance(r, list):
+        raise ValueError(f"userFunding returned unexpected payload type "
+                         f"{type(r).__name__}: {str(r)[:80]}")
+    return r
 
 
 def spot_clearinghouse_state(address: str) -> dict:
     """HL spot balances (60s per-address cache): {"balances": [{"coin":
     "@1/PURR", "hold": "...", "total": "..."}, ...]}."""
-    return _cached_get("spotClearinghouseState",
-                       {"user": _norm_addr(address)})
+    r = _cached_get("spotClearinghouseState",
+                    {"user": _norm_addr(address)})
+    if not isinstance(r, dict):
+        raise ValueError(f"spotClearinghouseState returned unexpected "
+                         f"payload type {type(r).__name__}: {str(r)[:80]}")
+    return r
 
 
 # ---------------------------------------------------------------------------

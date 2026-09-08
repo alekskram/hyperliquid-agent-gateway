@@ -610,6 +610,15 @@ class TestTraderActivity:
         out = srv.trader_activity(ADDR)
         assert out["error"] and "fills down" in out["error"]
 
+    def test_non_list_payload_degrades_to_error_dict(self, monkeypatch):
+        """A non-list userFills payload (int from _cached_get) trips the
+        info-level guard, whose ValueError must surface as an honest
+        error dict - never a TypeError traceback."""
+        monkeypatch.setattr(info, "_cached_get", lambda *a, **k: 5)
+        out = srv.trader_activity(ADDR)
+        assert isinstance(out, dict)
+        assert out["error"] and "unexpected payload" in out["error"]
+
 
 class TestFundingCarryScreener:
     def test_rank_all_from_one_call(self, mock_info):
