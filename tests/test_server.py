@@ -184,7 +184,39 @@ class TestSpotOverview:
                    and t["token"].startswith("0x") for t in toks)
 
     def test_limit(self, mock_info):
-        assert srv.spot_overview(limit=2)["returned"] == 2
+        # unit-token pairs are pinned ahead of the volume top-N, so
+        # returned = pinned + up-to-N non-unit rows
+        out = srv.spot_overview(limit=2)
+        assert out["returned"] == out["unit_pairs_pinned"] + 2
+
+    def test_unit_tokens_pinned_beyond_volume_cap(self, mock_info):
+        """Regression (S-23, MEC-127): UBTC/UETH spot legs sit outside
+        any volume-capped window; they must always be observable."""
+        out = srv.spot_overview(limit=1)
+        bases = {t.get("name") for r in out["pairs"] for t in r["tokens"]}
+        assert "UBTC" in bases and "UETH" in bases
+        assert out["unit_pairs_pinned"] >= 2
+
+    def test_quote_resolves_unit_token_base(self, mock_info, monkeypatch):
+        """quote('UBTC') resolves to the UBTC spot pair's @-index
+        address (was: unknown coin — perp-only validation rejected unit
+        tokens); the friendly pair name rides along as pair_display."""
+        seen = {}
+
+        def _book(coin):
+            seen["coin"] = coin
+            return L2BOOK
+
+        monkeypatch.setattr(info, "l2_book", _book)
+        q = srv.quote("UBTC")
+        assert q["coin"].startswith("@")          # API address form
+        assert q["pair_display"] == "UBTC/USDC"   # friendly form
+        assert seen["coin"] == q["coin"]
+
+    def test_quote_unknown_coin_still_raises(self, mock_info):
+        import pytest
+        with pytest.raises(ValueError):
+            srv.quote("NOTACOIN")
 
     def test_malformed_pair_error_dict(self, monkeypatch):
         monkeypatch.setattr(info, "spot_meta", lambda: SPOT_META)

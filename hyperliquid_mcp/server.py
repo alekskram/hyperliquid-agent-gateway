@@ -158,6 +158,62 @@ def _perp_universe() -> list[dict]:
     return (meta or {}).get("universe") or []
 
 
+def _unit_token_names() -> set[str]:
+    """Canonical unit-token spot coins: 'U' + perp name (UBTC for BTC,
+    UETH for ETH, ...). Derived from the perp universe so it never goes
+    stale as new unit tokens list."""
+    try:
+        return {"U" + u.get("name", "") for u in _perp_universe()
+                if u.get("name")}
+    except (ValueError, RuntimeError):
+        return set()
+
+
+def _spot_token_map() -> dict:
+    """pair name -> 'BASE/QUOTE' display from spotMeta (None on upstream
+    failure — display is cosmetic, never fatal)."""
+    try:
+        sm = info.spot_meta()
+    except (ValueError, RuntimeError):
+        return {}
+    tokens = {t.get("index"): (t.get("name") or "")
+              for t in (sm.get("tokens") or [])}
+    out = {}
+    for u in (sm.get("universe") or []):
+        ids = u.get("tokens") or []
+        names = [tokens.get(i) for i in ids]
+        if u.get("name") and all(names):
+            out[u["name"]] = "/".join(names)
+    return out
+
+
+def _resolve_spot_pair(coin: str) -> str | None:
+    """Resolve a user-facing spot reference to a tradeable pair name:
+    exact pair name ('UBTC/USDC') or bare base token ('UBTC' -> its
+    USDC-quoted pair, falling back to the first pair that quotes it).
+    None when the coin matches no spot pair."""
+    try:
+        sm = info.spot_meta()
+    except (ValueError, RuntimeError):
+        return None
+    tokens = {t.get("index"): (t.get("name") or "")
+              for t in (sm.get("tokens") or [])}
+    want = (coin or "").strip().upper()
+    exact, by_base = [], []
+    for u in (sm.get("universe") or []):
+        name = u.get("name") or ""
+        base = tokens.get((u.get("tokens") or [None])[0], "")
+        if name.upper() == want:
+            exact.append((name, base))
+        elif base == want:
+            by_base.append((name, base))
+    for cands in (exact, by_base):
+        if cands:
+            usdc = [n for n, b in cands if n.upper().endswith("/USDC")]
+            return sorted(usdc or [n for n, _ in cands])[0]
+    return None
+
+
 def _perp_ctx(coin: str) -> dict | None:
     """AssetCtx row for `coin` (index join meta.universe[i] == ctxs[i])."""
     want = (coin or "").strip().upper()
@@ -321,18 +377,29 @@ def spot_overview(limit: int = 20) -> dict:
         })
     # prefer explicit OI when present, else fall back to volume sort key
     rows.sort(key=lambda r: r.get("day_volume") or 0.0, reverse=True)
+    # unit tokens (UBTC/UETH/...) are low-volume spot legs of huge perps
+    # and fall outside any volume-capped window; pin them so the unit
+    # spot-perp basis (S-23-class work) is always observable
+    units = _unit_token_names()
+    unit_rows = [r for r in rows
+                 if any(t.get("name") in units for t in r["tokens"])]
+    unit_pairs = {r["pair"] for r in unit_rows}
     n = max(1, min(100, int(limit)))
+    top = [r for r in rows if r["pair"] not in unit_pairs][:n]
+    out_rows = unit_rows + top
     return {
         "count": len(rows),
-        "returned": min(n, len(rows)),
-        "pairs": rows[:n],
+        "returned": len(out_rows),
+        "unit_pairs_pinned": len(unit_rows),
+        "pairs": out_rows,
         **_age("spotMetaAndAssetCtxs", {}),
         "note": "spot pairs are '@{index}/BASE' - display_name resolves "
                 "the index token via spotMeta.tokens; token.token is the "
                 "ERC-20 contract where the token is an HIP-1 deployed "
                 "coin. Spot OI is not published per-pair; "
                 "open_interest mirrors notional volume as the closest "
-                "activity measure.",
+                "activity measure. Canonical unit tokens (UBTC/UETH/"
+                "...) are pinned ahead of the volume-capped top-N.",
     }
 
 
@@ -363,7 +430,12 @@ def quote(coin: str) -> dict:
         try:
             raw = _require_coin(raw)
         except ValueError as e:
-            raise ValueError(str(e))
+            # spot references resolve against spotMeta: exact pair names
+            # ('UBTC/USDC') and bare unit-token bases ('UBTC')
+            resolved = _resolve_spot_pair(raw)
+            if resolved is None:
+                raise ValueError(str(e)) from None
+            raw = resolved
     try:
         mids = info.all_mids()
         book = info.l2_book(raw)
@@ -382,6 +454,8 @@ def quote(coin: str) -> dict:
         (bid + ask) / 2 if bid is not None and ask is not None else None)
     return {
         "coin": raw,
+        "pair_display": _spot_token_map().get(raw)
+                        if raw.startswith("@") else None,
         "bid": bid, "ask": ask, "mid": mid,
         "spread": spread,
         "spread_bps": _round(spread / mid * 10000, 2)
