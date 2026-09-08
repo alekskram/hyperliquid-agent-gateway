@@ -108,7 +108,7 @@ destructiveHint: false, openWorldHint: true`).
 |---|------|-----------|--------------|
 | 1 | `market_overview` | `market_overview(limit=20, sort="open_interest")` | Perp market snapshot from ONE `metaAndAssetCtxs` call: per-coin mark, open interest, day volume, premium, max leverage + totals. `sort` in {open_interest, volume, premium}. |
 | 2 | `spot_overview` | `spot_overview(limit=20)` | Spot pairs from `spotMeta` + ctxs with HIP-1 to ERC-20 links; `@{index}` names resolved to readable token names. |
-| 3 | `quote` | `quote(coin)` | Bid/ask/mid/spread + top-of-book sizes from `allMids` + `l2Book`. Unknown coin raises with 5 examples. |
+| 3 | `quote` | `quote(coin)` | Bid/ask/mid/spread + top-of-book sizes from `l2Book`. `mid` is the book midpoint `(bid+ask)/2` when both sides exist (`mid_source: "book"`); `allMids` is only a labeled fallback when the book lacks a side (`mid_source: "allMids"`); `mid_source: null` when neither knows the coin — with both sides present `mid` never leaves `[bid, ask]`. `coin` is the ONLY parameter (no `size`/`limit`). Unknown coin raises with 5 examples. |
 | 4 | `order_book` | `order_book(coin, depth=10)` | Book levels per side with nSigFigs aggregation and per-side total liquidity. |
 | 5 | `candles` | `candles(coin, interval="1h", limit=100)` | OHLCV rows newest-first; intervals 1m/15m/1h/4h/1d/1w/1M; `startTime` computed from `limit`. |
 | 6 | `trades` | `trades(coin, limit=20)` | Recent public fills WITH both sides' addresses (`users: [maker, taker]`). |

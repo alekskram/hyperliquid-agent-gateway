@@ -27,7 +27,7 @@ from . import evm
 from . import info
 
 DEFAULT_PORT = 8903
-_VERSION = "0.1.1"
+_VERSION = "0.1.2"
 
 _ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 
@@ -418,8 +418,11 @@ def _spot_display_name(pair: str, tokens: dict) -> str:
 
 
 def quote(coin: str) -> dict:
-    """One coin's live quote from allMids + l2Book: bid/ask/mid/spread
-    and top-of-book sizes. The coin is validated against the perp
+    """One coin's live quote from l2Book: bid/ask/mid/spread and
+    top-of-book sizes. mid is the book midpoint ((bid+ask)/2) whenever
+    both sides are present ('book'); allMids is only a labeled fallback
+    when the book lacks a side ('allMids'), so mid never escapes the
+    [bid, ask] range. The coin is validated against the perp
     universe (spot '@{index}/NAME' pairs pass through to the book).
     Example: quote(coin="BTC")
     """
@@ -442,7 +445,6 @@ def quote(coin: str) -> dict:
     except (ValueError, RuntimeError) as e:
         return _err("info", f"quote data unavailable for {coin!r}: {e}",
                     "upstream /info failure")
-    mid = _f(mids.get(raw)) if isinstance(mids, dict) else None
     bids, asks = _book_sides(book)
     bid = _f(bids[0].get("px")) if bids else None
     ask = _f(asks[0].get("px")) if asks else None
@@ -450,13 +452,21 @@ def quote(coin: str) -> dict:
     ask_sz = _f(asks[0].get("sz")) if asks else None
     spread = round(ask - bid, 8) if bid is not None and ask is not None \
         else None
-    mid = mid if mid is not None else (
-        (bid + ask) / 2 if bid is not None and ask is not None else None)
+    # mid from the book when both sides exist; allMids (a mark-style
+    # oracle) only fills in when a side is missing, and is labeled so
+    # consumers can distrust it for spread-sensitive math.
+    if bid is not None and ask is not None:
+        mid = _round((bid + ask) / 2)
+        mid_source = "book"
+    else:
+        mid = _f(mids.get(raw)) if isinstance(mids, dict) else None
+        mid_source = "allMids" if mid is not None else None
     return {
         "coin": raw,
         "pair_display": _spot_token_map().get(raw)
                         if raw.startswith("@") else None,
         "bid": bid, "ask": ask, "mid": mid,
+        "mid_source": mid_source,
         "spread": spread,
         "spread_bps": _round(spread / mid * 10000, 2)
                       if spread is not None and mid else None,
