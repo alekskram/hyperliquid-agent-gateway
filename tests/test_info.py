@@ -286,3 +286,47 @@ class TestTypedHelpers:
         monkeypatch.setattr(urllib.request, "urlopen", fake)
         info.clearinghouse_state("0x" + "AB" * 20)
         assert seen[0]["user"] == "0x" + "ab" * 20
+
+
+class TestPayloadTypeGuards:
+    """Upstream /info can (data-dependent) serve a non-list payload for
+    userFills/userFunding and a non-dict for clearinghouseState/
+    spotClearinghouseState. The typed helpers must raise ValueError
+    (caught by the tool-level fetch guards) instead of letting later
+    iteration die with TypeError."""
+
+    @staticmethod
+    def _int_payload(monkeypatch):
+        monkeypatch.setattr(info, "_cached_get", lambda *a, **k: 5)
+
+    def test_user_fills_non_list_payload_raises_value_error(
+            self, monkeypatch):
+        self._int_payload(monkeypatch)
+        with pytest.raises(ValueError, match="unexpected payload"):
+            info.user_fills("0x" + "11" * 20)
+
+    def test_user_funding_non_list_payload_raises_value_error(
+            self, monkeypatch):
+        self._int_payload(monkeypatch)
+        with pytest.raises(ValueError, match="unexpected payload"):
+            info.user_funding("0x" + "11" * 20)
+
+    def test_clearinghouse_state_non_dict_payload_raises_value_error(
+            self, monkeypatch):
+        self._int_payload(monkeypatch)
+        with pytest.raises(ValueError, match="unexpected payload"):
+            info.clearinghouse_state("0x" + "11" * 20)
+
+    def test_spot_clearinghouse_state_non_dict_payload_raises_value_error(
+            self, monkeypatch):
+        self._int_payload(monkeypatch)
+        with pytest.raises(ValueError, match="unexpected payload"):
+            info.spot_clearinghouse_state("0x" + "11" * 20)
+
+    def test_guard_message_names_endpoint_type_and_snippet(
+            self, monkeypatch):
+        self._int_payload(monkeypatch)
+        with pytest.raises(ValueError) as e:
+            info.user_fills("0x" + "11" * 20)
+        assert str(e.value).startswith(
+            "userFills returned unexpected payload type int: 5")

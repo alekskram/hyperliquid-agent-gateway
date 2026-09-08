@@ -15,6 +15,14 @@ Fix release for the `quote` mid source.
   within [bid, ask]. `spread_bps` is computed from the returned mid
   as before. README tool table now also states the exact signature:
   `quote(coin)` — `coin` is the only parameter (no `size`/`limit`).
+- user-endpoint payload guards: `/info` occasionally serves a
+  data-dependent non-list payload for `userFills`/`userFunding` (and
+  a non-dict for `clearinghouseState`/`spotClearinghouseState`),
+  which crashed `trader_activity` with `TypeError: 'int' object is
+  not iterable` past the tool's fetch guards. The typed helpers now
+  validate the payload shape and raise `ValueError` naming the
+  endpoint, the offending type and an 80-char snippet, so the tools
+  degrade to their honest error dicts instead of a raw traceback.
 - Version bumped to 0.1.2 (pyproject == package == server == lock).
 
 ## 0.1.1 (2026-09-06)
