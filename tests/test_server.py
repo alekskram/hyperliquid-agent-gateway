@@ -236,6 +236,53 @@ class TestQuote:
         assert q["spread_bps"] is not None
         assert q["top_bid_size"] is not None
 
+    def test_mid_from_book_ignores_allmids_outside_spread(
+            self, mock_info, monkeypatch):
+        """Regression (v0.1.1 defect): allMids is a mark-style oracle
+        and can sit outside the book — a unit token showed mid
+        78352.5 at bid 78330 / ask 78337, leaking above the ask and
+        skewing spread-sensitive consumers. With both book sides
+        present, mid MUST be the book midpoint and allMids ignored."""
+        book = {"coin": "BTC", "time": 1788713174308, "levels": [
+            [{"px": "78330.0", "sz": "1.0", "n": 2}],
+            [{"px": "78337.0", "sz": "2.0", "n": 3}],
+        ]}
+        monkeypatch.setattr(info, "l2_book", lambda coin: book)
+        monkeypatch.setattr(info, "all_mids", lambda: {"BTC": "78352.5"})
+        q = srv.quote("BTC")
+        assert q["bid"] == 78330.0 and q["ask"] == 78337.0
+        assert q["mid"] == 78333.5                 # (bid+ask)/2, not 78352.5
+        assert q["mid_source"] == "book"
+        assert q["bid"] <= q["mid"] <= q["ask"]    # invariant
+        assert q["spread_bps"] == round(7.0 / 78333.5 * 10000, 2)
+
+    def test_mid_allmids_fallback_when_one_side_empty(
+            self, mock_info, monkeypatch):
+        """Book without bids (or asks) -> mid falls back to allMids
+        and the response says so via mid_source."""
+        book = {"coin": "BTC", "time": 1788713174308, "levels": [
+            [],
+            [{"px": "79673.0", "sz": "3.04934", "n": 18}],
+        ]}
+        monkeypatch.setattr(info, "l2_book", lambda coin: book)
+        monkeypatch.setattr(info, "all_mids", lambda: {"BTC": "79672.5"})
+        q = srv.quote("BTC")
+        assert q["bid"] is None and q["ask"] == 79673.0
+        assert q["mid"] == 79672.5
+        assert q["mid_source"] == "allMids"
+        assert q["spread"] is None and q["spread_bps"] is None
+
+    def test_mid_none_when_book_empty_and_allmids_unknown(
+            self, mock_info, monkeypatch):
+        """Both book sides empty and allMids does not know the coin
+        -> mid and mid_source are null (honest), never a crash."""
+        monkeypatch.setattr(
+            info, "l2_book", lambda coin: {"coin": coin, "levels": [[], []]})
+        monkeypatch.setattr(info, "all_mids", lambda: {"ETH": "2482.85"})
+        q = srv.quote("BTC")
+        assert q["mid"] is None
+        assert q["mid_source"] is None
+
     def test_case_insensitive(self, mock_info):
         assert srv.quote("btc")["coin"] == "BTC"
 

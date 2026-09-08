@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.2 (2026-09-08)
+
+Fix release for the `quote` mid source.
+
+- `quote` (blocker): mid was taken from `allMids` (a mark-style
+  oracle) while bid/ask came from `l2Book`, so on thin unit tokens
+  mid systematically escaped the quoted spread (UBTC mid 78352.5 at
+  bid 78330 / ask 78337), skewing spread-sensitive consumers. mid is
+  now computed from the book — `(bid+ask)/2` whenever both sides are
+  present — and `allMids` is only a labeled fallback when the book
+  lacks a side. Every response carries `mid_source`
+  ('book' | 'allMids' | null); with both sides present mid is always
+  within [bid, ask]. `spread_bps` is computed from the returned mid
+  as before. README tool table now also states the exact signature:
+  `quote(coin)` — `coin` is the only parameter (no `size`/`limit`).
+- Version bumped to 0.1.2 (pyproject == package == server == lock).
+
 ## 0.1.1 (2026-09-06)
 
 Fix release from the independent v0.1.0 review.
