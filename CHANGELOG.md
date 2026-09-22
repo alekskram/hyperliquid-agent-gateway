@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 (2026-09-09) — promotion pass
+
+README install funnel: claude mcp add, PyPI-first uvx config (was git+), duplicated hosted section removed, badges, raw-API comparison, suite cross-links; server.json added; mcp-name comment.
+
+
 ## 0.1.2 (2026-09-08)
 
 Fix release for the `quote` mid source.

@@ -1,5 +1,7 @@
 # hyperliquid-agent-gateway
 
+<!-- mcp-name: io.github.alekskram/hyperliquid-agent-gateway -->
+
 [![CI](https://github.com/alekskram/hyperliquid-agent-gateway/actions/workflows/tests.yml/badge.svg)](https://github.com/alekskram/hyperliquid-agent-gateway/actions/workflows/tests.yml)
 [![PyPI](https://img.shields.io/pypi/v/hyperliquid-agent-gateway.svg)](https://pypi.org/project/hyperliquid-agent-gateway/)
 [![PyPI downloads](https://img.shields.io/pypi/dm/hyperliquid-agent-gateway?label=downloads)](https://pypi.org/project/hyperliquid-agent-gateway/)
