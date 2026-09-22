@@ -2,21 +2,38 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.alekskram/hyperliquid-agent-gateway",
   "title": "Hyperliquid Agent Gateway",
-  "description": "Read-only MCP gateway to Hyperliquid: 233 perps + spot, funding carry screener, account liquidation risk, trader activity, HyperEVM transfers. No keys.",
+  "description": "Read-only MCP gateway to Hyperliquid: 233 perps + spot, funding carry, account risk, HyperEVM.",
   "version": "0.1.2",
   "tools": [
-    {"name": "market_overview", "description": "Perp snapshot from one call: mark, OI, volume, premium, leverage"},
-    {"name": "funding_carry_screener", "description": "Ranks all perps by funding carry, history only for the top-N"},
-    {"name": "liquidation_risk", "description": "Per-account margin summary, leverage and liquidation distance"},
-    {"name": "quote", "description": "Book-derived bid/ask/mid that never leaves [bid, ask], labeled fallbacks"},
-    {"name": "trader_activity", "description": "Any address: fills PnL, fees, volume, win-rate, open positions"}
+    {
+      "name": "market_overview",
+      "description": "Perp snapshot from one call: mark, OI, volume, premium, leverage"
+    },
+    {
+      "name": "funding_carry_screener",
+      "description": "Ranks all perps by funding carry, history only for the top-N"
+    },
+    {
+      "name": "liquidation_risk",
+      "description": "Per-account margin summary, leverage and liquidation distance"
+    },
+    {
+      "name": "quote",
+      "description": "Book-derived bid/ask/mid that never leaves [bid, ask], labeled fallbacks"
+    },
+    {
+      "name": "trader_activity",
+      "description": "Any address: fills PnL, fees, volume, win-rate, open positions"
+    }
   ],
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "hyperliquid-agent-gateway",
       "version": "0.1.2",
-      "transport": {"type": "stdio"}
+      "transport": {
+        "type": "stdio"
+      }
     }
   ],
   "repository": {
