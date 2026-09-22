@@ -27,7 +27,7 @@ from . import evm
 from . import info
 
 DEFAULT_PORT = 8903
-_VERSION = "0.1.2"
+_VERSION = "0.1.3"
 
 _ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 

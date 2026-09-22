@@ -3,7 +3,7 @@
   "name": "io.github.alekskram/hyperliquid-agent-gateway",
   "title": "Hyperliquid Agent Gateway",
   "description": "Read-only MCP gateway to Hyperliquid: 233 perps + spot, funding carry, account risk, HyperEVM.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "tools": [
     {
       "name": "market_overview",
@@ -30,7 +30,7 @@
     {
       "registryType": "pypi",
       "identifier": "hyperliquid-agent-gateway",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "transport": {
         "type": "stdio"
       }
