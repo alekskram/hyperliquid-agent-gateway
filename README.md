@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/alekskram/hyperliquid-agent-gateway/actions/workflows/tests.yml/badge.svg)](https://github.com/alekskram/hyperliquid-agent-gateway/actions/workflows/tests.yml)
 [![PyPI](https://img.shields.io/pypi/v/hyperliquid-agent-gateway.svg)](https://pypi.org/project/hyperliquid-agent-gateway/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/hyperliquid-agent-gateway?label=downloads)](https://pypi.org/project/hyperliquid-agent-gateway/)
+[![MCP Catalog](https://img.shields.io/badge/MCP_Catalog-glama.ai-4f46e5)](https://glama.ai/mcp/servers/alekskram/hyperliquid-agent-gateway)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](pyproject.toml)
 
@@ -25,6 +27,11 @@ Full walkthroughs: [examples/use-cases.md](examples/use-cases.md).
 
 ## Quickstart
 
+**Claude Code:**
+```bash
+claude mcp add hyperliquid -- uvx hyperliquid-agent-gateway
+```
+
 stdio (default, for local agents):
 
 ```bash
@@ -47,18 +54,16 @@ Claude Desktop / Cursor config:
   "mcpServers": {
     "hyperliquid": {
       "command": "uvx",
-      "args": ["--from",
-               "git+https://github.com/alekskram/hyperliquid-agent-gateway",
-               "hyperliquid-agent-gateway"]
+      "args": ["hyperliquid-agent-gateway"]
     }
   }
 }
 ```
 
-Hosted form - streamable HTTP on port **8903**:
+Hosted form — streamable HTTP on port **8903**:
 
 ```bash
-uv run hyperliquid-agent-gateway --http            # 127.0.0.1:8903
+uvx hyperliquid-agent-gateway --http             # 127.0.0.1:8903
 curl http://127.0.0.1:8903/health   # -> {"ok": true, "service": "hyperliquid-agent-gateway", ...}
 ```
 
@@ -93,12 +98,6 @@ PY
 ```
 </details>
 
-Hosted form — streamable HTTP on port **8903**:
-
-```bash
-uvx hyperliquid-agent-gateway --http
-```
-
 ## Tools
 
 All 12 tools are read-only (annotated `readOnlyHint: true,
@@ -118,6 +117,18 @@ destructiveHint: false, openWorldHint: true`).
 | 10 | `funding_carry_screener` | `funding_carry_screener(topN=10, metric="premium")` | Ranks ALL perps from ONE call; `fundingHistory` fetched only for the topN (weight economy). |
 | 11 | `token_transfers` | `token_transfers(contract, limit=100, from_block=None)` | HyperEVM ERC-20 Transfer logs via adaptive-window `eth_getLogs`; rows carry from/to/value/txHash/blockNumber/ts with per-token `decimals` + `decimals_source` (static map or `assumed_18`). |
 | 12 | `wallet_balance` | `wallet_balance(address)` | Native (eth_getBalance) + up to 20 ERC-20s (eth_call balanceOf, resolved from spotMeta) + Hyperliquid spot balances; every row carries `decimals`/`decimals_source`. |
+
+## Why a gateway and not the raw API?
+
+`api.hyperliquid.xyz/info` is open and one `POST` away — the traps start after that:
+
+| Raw API gives you | You would have to build |
+|---|---|
+| two mid-price sources that disagree (`allMids` vs `l2Book`) | the discipline of book-derived mids that never leave `[bid, ask]`, with labeled fallbacks |
+| `candleSnapshot` whose cache key ignores nested request params | per-coin cache isolation (a naive first-coin key poisons every subsequent coin for the TTL) |
+| OI in base units, funding as an hourly rate | unit normalization (×price), annualized carry math, a one-call screener that fetches history only for the top-N |
+| live positions that carry no `markPx` | per-coin mark resolution with a `mark_px_source` tag on every row, plus estimated-vs-published liquidation distance flags |
+| raw HyperEVM RPCs | adaptive-window `eth_getLogs`, decimals resolution with `decimals_source` provenance |
 
 ## Rate limits
 
@@ -172,6 +183,19 @@ per-address account types 60s.
   not trust 6dp precision for unmapped tokens.
 - Cached responses carry `age_seconds` / `fetched_at` freshness fields.
 
+
+## Part of the suite
+
+Four sibling read-only MCP gateways, one style — keyless, cached, honest degradation:
+
+| Gateway | Focus |
+|---|---|
+| [dydx-agent-gateway](https://github.com/alekskram/dydx-agent-gateway) | dYdX v4: verified trader PnL, funding/OI anomaly detectors, leaderboard |
+| [arcus-agent-gateway](https://github.com/alekskram/arcus-agent-gateway) | 194 tokenized US equities on Robinhood Chain: quotes, holders, whale transfers |
+| **hyperliquid-agent-gateway** (you are here) | Hyperliquid: 233 perps + spot, funding carry, account risk, HyperEVM |
+| [aster-agent-gateway](https://github.com/alekskram/aster-agent-gateway) | Aster DEX: ~580 futures incl. 24/7 TradFi perps, funding caps/floors |
+
+All four are on [glama.ai](https://glama.ai/mcp/servers/alekskram/hyperliquid-agent-gateway) and PyPI — install any of them with `uvx <name>`.
 
 ## License
 
