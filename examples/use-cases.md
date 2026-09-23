@@ -1,12 +1,11 @@
 # Real Trading Problems Solved
 
-Four scenarios a trader or risk-watcher faces daily — solved with single MCP
-calls. All outputs below are real captures (2026-09-22), lightly shortened.
+Four scenarios a risk-watcher hits daily; each closes with one call. Outputs are real captures from 2026-09-22, lightly shortened.
 
 ## 1. "Where is the funding carry paying?"
 
-**Pain:** Funding is paid hourly, but the obvious coins pay nothing. You want
-the ranked board, without burning the API weight budget.
+The obvious coins pay nothing, funding arrives hourly, and the weight budget
+(1200/min) punishes the naive. The screener exists for exactly this.
 
 ```
 → funding_carry_screener(topN=5, metric="premium")
@@ -19,15 +18,14 @@ the ranked board, without burning the API weight budget.
   fundingHistory fetched only for the returned top-N
 ```
 
-**Why it matters:** the screener ranks all 234 perps by live premium and only
-then fetches 168h funding history for the top-N — you see whether the current
-rate is a spike or a sustained regime, in one call, without hammering the
-1200 weight/min budget.
+Ranking all 234 perps costs one call; history is fetched only for the top-N,
+so you stay well inside the weight budget. The 168h average next to the live
+rate is what tells you spike from regime.
 
 ## 2. "How close is this whale to liquidation?"
 
-**Pain:** A 25x whale is underwater and you want the distance to the cascade —
-not a screenshot, the numbers.
+A 25x whale is underwater. You want the distance to the cascade in numbers,
+not a screenshot.
 
 ```
 → liquidation_risk(address="0xfc27…9d9d")
@@ -41,16 +39,16 @@ not a screenshot, the numbers.
   mark resolved per coin from metaAndAssetCtxs (mark_px_source on every row)
 ```
 
-**Why it matters:** when the venue publishes `liquidationPx` you get the real
-distance (flagged `estimated: false`); when it doesn't, you get an explicitly
-flagged estimate from the maintenance-margin ratio. Every mark price carries
-its source — you always know which numbers are the exchange's and which are
-derived.
+Where the venue publishes `liquidationPx`, the distance is the exchange's own
+number, flagged `estimated: false`. Where it doesn't, the estimate says so
+explicitly and comes from the maintenance-margin ratio. Every mark price
+carries its source tag, so the exchange's numbers and the derived ones never
+mix silently.
 
 ## 3. "What does the whole board look like right now?"
 
-**Pain:** You need the OI/volume/premium layout of all 233 perps before
-deciding where to look closer.
+Before drilling anywhere you want the whole board's layout: OI, volume,
+premium.
 
 ```
 → market_overview(limit=5, sort="open_interest")
@@ -61,14 +59,13 @@ deciding where to look closer.
   ─ totals: 234 perps, OI $14.04B, 24h volume $7.18B
 ```
 
-**Why it matters:** one call, the whole board with OI normalized to USD
-(`open_interest_usd = openInterest × markPx` — the raw API gives you coin
-units), totals included.
+One call returns the full board with OI already in USD (`open_interest_usd =
+openInterest × markPx`; the raw API speaks coin units) and totals attached.
 
 ## 4. "Who is this address, actually?"
 
-**Pain:** Before you trust a wallet's "track record" you want their real
-fills, fees, win-rate and funding drag.
+Before trusting a wallet's "track record" you want the fills, the fees, the
+win-rate and the funding drag.
 
 ```
 → trader_activity(address="0xf3f4…744")
@@ -78,7 +75,7 @@ fills, fees, win-rate and funding drag.
   — honest nulls when there is nothing to compute, never invented zeros
 ```
 
-**Why it matters:** the win-rate note states exactly what is counted (share
-of closed fills with closedPnl > 0), the fees split shows builder bribes, and
-an empty account returns explicit zeros with `fills_analyzed: 0` rather than
-a silent empty list.
+The win-rate note states exactly what is counted (closed fills with
+closedPnl > 0, partials per fill). Fees split into exchange and builder. An
+empty account returns explicit zeros with `fills_analyzed: 0`, never a silent
+empty list.
